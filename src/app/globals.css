@@ -1,0 +1,523 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   TRUSTLESS GIG ESCROW - CYBERPUNK THEME
+   "GitHub Dark Mode meets Cyberpunk Terminal"
+   ============================================ */
+
+@layer base {
+  :root {
+    /* Core void colors */
+    --void: #0d1117;
+    --void-50: #161b22;
+    --void-100: #21262d;
+    --void-200: #30363d;
+    
+    /* Neon accents */
+    --neon-green: #39d353;
+    --neon-purple: #a371f7;
+    --neon-cyan: #58a6ff;
+    --neon-yellow: #d29922;
+    --neon-red: #f85149;
+    
+    /* Terminal colors */
+    --terminal-text: #c9d1d9;
+    --terminal-muted: #8b949e;
+  }
+
+  /* Custom scrollbar - Terminal style */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--void);
+    border-left: 1px solid var(--void-200);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--void-200);
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-green);
+    box-shadow: 0 0 10px var(--neon-green);
+  }
+
+  /* Selection styling */
+  ::selection {
+    background: rgba(57, 211, 83, 0.3);
+    color: var(--neon-green);
+  }
+
+  /* Base body styling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--void);
+    color: var(--terminal-text);
+    font-feature-settings: "liga" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  /* ============================================
+     GRID BACKGROUND PATTERN
+     ============================================ */
+  .bg-void-grid {
+    background-color: var(--void);
+    background-image: 
+      linear-gradient(rgba(48, 54, 61, 0.4) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(48, 54, 61, 0.4) 1px, transparent 1px);
+    background-size: 50px 50px;
+    background-position: -1px -1px;
+  }
+
+  /* Subtle scan line effect overlay */
+  .scan-lines::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(0, 0, 0, 0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ============================================
+     NEON BORDER EFFECTS
+     ============================================ */
+  .neon-border {
+    position: relative;
+    border: 1px solid var(--void-200);
+  }
+
+  .neon-border::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(90deg, var(--neon-green), var(--neon-purple), var(--neon-cyan), var(--neon-green));
+    background-size: 200% 100%;
+    border-radius: inherit;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    animation: border-trace 3s linear infinite;
+  }
+
+  .neon-border:hover::before {
+    opacity: 1;
+  }
+
+  .neon-border::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--void);
+    border-radius: inherit;
+    z-index: -1;
+  }
+
+  /* ============================================
+     GLITCH TEXT EFFECT
+     ============================================ */
+  .glitch {
+    position: relative;
+    animation: glitch-skew 1s infinite linear alternate-reverse;
+  }
+
+  .glitch::before,
+  .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .glitch::before {
+    left: 2px;
+    text-shadow: -2px 0 var(--neon-red);
+    clip: rect(44px, 450px, 56px, 0);
+    animation: glitch-anim 5s infinite linear alternate-reverse;
+  }
+
+  .glitch::after {
+    left: -2px;
+    text-shadow: -2px 0 var(--neon-cyan);
+    clip: rect(44px, 450px, 56px, 0);
+    animation: glitch-anim2 5s infinite linear alternate-reverse;
+  }
+
+  @keyframes glitch-anim {
+    0% { clip: rect(31px, 9999px, 94px, 0); transform: skew(0.85deg); }
+    5% { clip: rect(70px, 9999px, 71px, 0); transform: skew(0.34deg); }
+    10% { clip: rect(29px, 9999px, 24px, 0); transform: skew(0.6deg); }
+    15% { clip: rect(64px, 9999px, 51px, 0); transform: skew(0.73deg); }
+    20% { clip: rect(53px, 9999px, 15px, 0); transform: skew(0.29deg); }
+    25% { clip: rect(39px, 9999px, 30px, 0); transform: skew(0.16deg); }
+    30% { clip: rect(80px, 9999px, 34px, 0); transform: skew(0.87deg); }
+    35% { clip: rect(96px, 9999px, 59px, 0); transform: skew(0.95deg); }
+    40% { clip: rect(91px, 9999px, 25px, 0); transform: skew(0.69deg); }
+    45% { clip: rect(75px, 9999px, 84px, 0); transform: skew(0.21deg); }
+    50% { clip: rect(86px, 9999px, 95px, 0); transform: skew(0.63deg); }
+    55% { clip: rect(19px, 9999px, 47px, 0); transform: skew(0.33deg); }
+    60% { clip: rect(43px, 9999px, 98px, 0); transform: skew(0.48deg); }
+    65% { clip: rect(67px, 9999px, 62px, 0); transform: skew(0.91deg); }
+    70% { clip: rect(28px, 9999px, 16px, 0); transform: skew(0.77deg); }
+    75% { clip: rect(52px, 9999px, 73px, 0); transform: skew(0.55deg); }
+    80% { clip: rect(14px, 9999px, 89px, 0); transform: skew(0.42deg); }
+    85% { clip: rect(38px, 9999px, 41px, 0); transform: skew(0.18deg); }
+    90% { clip: rect(61px, 9999px, 77px, 0); transform: skew(0.84deg); }
+    95% { clip: rect(83px, 9999px, 22px, 0); transform: skew(0.36deg); }
+    100% { clip: rect(45px, 9999px, 68px, 0); transform: skew(0.72deg); }
+  }
+
+  @keyframes glitch-anim2 {
+    0% { clip: rect(65px, 9999px, 100px, 0); transform: skew(0.6deg); }
+    5% { clip: rect(52px, 9999px, 74px, 0); transform: skew(0.88deg); }
+    10% { clip: rect(79px, 9999px, 85px, 0); transform: skew(0.4deg); }
+    15% { clip: rect(26px, 9999px, 67px, 0); transform: skew(0.95deg); }
+    20% { clip: rect(33px, 9999px, 5px, 0); transform: skew(0.24deg); }
+    25% { clip: rect(25px, 9999px, 52px, 0); transform: skew(0.71deg); }
+    30% { clip: rect(20px, 9999px, 68px, 0); transform: skew(0.56deg); }
+    35% { clip: rect(50px, 9999px, 55px, 0); transform: skew(0.81deg); }
+    40% { clip: rect(95px, 9999px, 45px, 0); transform: skew(0.37deg); }
+    45% { clip: rect(40px, 9999px, 27px, 0); transform: skew(0.62deg); }
+    50% { clip: rect(16px, 9999px, 97px, 0); transform: skew(0.49deg); }
+    55% { clip: rect(71px, 9999px, 36px, 0); transform: skew(0.93deg); }
+    60% { clip: rect(85px, 9999px, 77px, 0); transform: skew(0.28deg); }
+    65% { clip: rect(12px, 9999px, 83px, 0); transform: skew(0.75deg); }
+    70% { clip: rect(58px, 9999px, 15px, 0); transform: skew(0.44deg); }
+    75% { clip: rect(37px, 9999px, 92px, 0); transform: skew(0.67deg); }
+    80% { clip: rect(54px, 9999px, 21px, 0); transform: skew(0.19deg); }
+    85% { clip: rect(76px, 9999px, 48px, 0); transform: skew(0.86deg); }
+    90% { clip: rect(30px, 9999px, 60px, 0); transform: skew(0.52deg); }
+    95% { clip: rect(89px, 9999px, 35px, 0); transform: skew(0.78deg); }
+    100% { clip: rect(47px, 9999px, 81px, 0); transform: skew(0.33deg); }
+  }
+
+  @keyframes glitch-skew {
+    0% { transform: skew(0deg); }
+    10% { transform: skew(0.5deg); }
+    20% { transform: skew(-0.5deg); }
+    30% { transform: skew(0.3deg); }
+    40% { transform: skew(-0.3deg); }
+    50% { transform: skew(0deg); }
+    60% { transform: skew(0.2deg); }
+    70% { transform: skew(-0.2deg); }
+    80% { transform: skew(0.4deg); }
+    90% { transform: skew(-0.4deg); }
+    100% { transform: skew(0deg); }
+  }
+
+  /* ============================================
+     TERMINAL CURSOR
+     ============================================ */
+  .terminal-cursor::after {
+    content: "_";
+    animation: terminal-blink 1s step-end infinite;
+    color: var(--neon-green);
+    font-weight: bold;
+  }
+
+  @keyframes terminal-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* ============================================
+     CODE EDITOR STYLING
+     ============================================ */
+  .code-input {
+    background: var(--void);
+    border: 1px solid var(--void-200);
+    font-family: var(--font-geist-mono), monospace;
+    caret-color: var(--neon-green);
+    transition: all 0.2s ease;
+  }
+
+  .code-input:focus {
+    outline: none;
+    border-color: var(--neon-green);
+    box-shadow: 0 0 0 1px var(--neon-green), 0 0 20px rgba(57, 211, 83, 0.1);
+  }
+
+  .code-input::placeholder {
+    color: var(--terminal-muted);
+  }
+
+  /* Line numbers for code editor */
+  .line-numbers {
+    counter-reset: line;
+  }
+
+  .line-numbers > div::before {
+    counter-increment: line;
+    content: counter(line);
+    display: inline-block;
+    width: 2rem;
+    margin-right: 1rem;
+    text-align: right;
+    color: var(--terminal-muted);
+    border-right: 1px solid var(--void-200);
+    padding-right: 0.5rem;
+  }
+
+  /* ============================================
+     STATUS BADGES
+     ============================================ */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+  }
+
+  .status-locked {
+    color: var(--neon-yellow);
+    background: rgba(210, 153, 34, 0.1);
+    box-shadow: 0 0 10px rgba(210, 153, 34, 0.3);
+  }
+
+  .status-unlocked {
+    color: var(--neon-green);
+    background: rgba(57, 211, 83, 0.1);
+    box-shadow: 0 0 10px rgba(57, 211, 83, 0.3);
+  }
+
+  .status-pending {
+    color: var(--neon-cyan);
+    background: rgba(88, 166, 255, 0.1);
+    box-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
+  }
+
+  .status-merged {
+    color: var(--neon-purple);
+    background: rgba(163, 113, 247, 0.1);
+    box-shadow: 0 0 10px rgba(163, 113, 247, 0.3);
+  }
+
+  /* ============================================
+     BUTTON STYLES
+     ============================================ */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--neon-green-dim) 0%, var(--neon-green) 100%);
+    color: var(--void);
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0 20px rgba(57, 211, 83, 0.5);
+    transform: translateY(-2px);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .btn-merge {
+    background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    border: 1px solid #238636;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-merge:hover {
+    background: linear-gradient(135deg, #2ea043 0%, #39d353 100%);
+    box-shadow: 0 0 20px rgba(57, 211, 83, 0.4);
+  }
+
+  .btn-merge.merged {
+    background: linear-gradient(135deg, #8957e5 0%, #a371f7 100%);
+    border-color: #8957e5;
+  }
+
+  .btn-merge.merged:hover {
+    box-shadow: 0 0 20px rgba(163, 113, 247, 0.4);
+  }
+
+  /* ============================================
+     CARD STYLES
+     ============================================ */
+  .repo-card {
+    background: var(--void-50);
+    border: 1px solid var(--void-200);
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .repo-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--neon-green), var(--neon-purple));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .repo-card:hover {
+    border-color: var(--neon-green);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 1px rgba(57, 211, 83, 0.5);
+    transform: translateY(-4px);
+  }
+
+  .repo-card:hover::before {
+    opacity: 1;
+  }
+
+  /* ============================================
+     PROGRESS BAR (CI/CD Style)
+     ============================================ */
+  .progress-pipeline {
+    height: 4px;
+    background: var(--void-200);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-pipeline::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 30%;
+    background: linear-gradient(90deg, transparent, var(--neon-green), var(--neon-purple), transparent);
+    animation: progress-flow 2s ease-in-out infinite;
+  }
+
+  @keyframes progress-flow {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+  }
+
+  /* ============================================
+     CONFETTI EFFECT
+     ============================================ */
+  .confetti-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    overflow: hidden;
+  }
+
+  .confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    animation: confetti-fall 3s ease-out forwards;
+  }
+
+  @keyframes confetti-fall {
+    0% {
+      transform: translateY(-100%) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(100vh) rotate(720deg);
+      opacity: 0;
+    }
+  }
+
+  /* ============================================
+     RAINBOW KIT OVERRIDES
+     ============================================ */
+  [data-rk] {
+    --rk-colors-accentColor: var(--neon-green) !important;
+    --rk-colors-accentColorForeground: var(--void) !important;
+    --rk-colors-modalBackground: var(--void-50) !important;
+    --rk-colors-modalBorder: var(--void-200) !important;
+    --rk-colors-modalText: var(--terminal-text) !important;
+    --rk-colors-modalTextSecondary: var(--terminal-muted) !important;
+    --rk-radii-modal: 6px !important;
+    --rk-radii-menuButton: 4px !important;
+    --rk-radii-connectButton: 4px !important;
+  }
+}
+
+@layer utilities {
+  /* Text glow utilities */
+  .text-glow-green {
+    text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green);
+  }
+
+  .text-glow-purple {
+    text-shadow: 0 0 10px var(--neon-purple), 0 0 20px var(--neon-purple);
+  }
+
+  .text-glow-cyan {
+    text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    background: linear-gradient(135deg, var(--neon-green), var(--neon-purple), var(--neon-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Backdrop blur with fallback */
+  .backdrop-void {
+    backdrop-filter: blur(10px);
+    background: rgba(13, 17, 23, 0.8);
+  }
+}
