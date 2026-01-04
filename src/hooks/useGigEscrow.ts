@@ -1,18 +1,47 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   useAccount,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
   useChainId,
+  useConfig,
+  useWatchContractEvent,
 } from "wagmi";
-import { parseUnits } from "viem";
+import { waitForTransactionReceipt, readContract } from "wagmi/actions";
+import { parseUnits, formatUnits, decodeEventLog } from "viem";
 import { GIG_ESCROW_ABI, ERC20_ABI, getContractAddresses } from "@/config/contracts";
 import { Gig, GigStatus, CreateGigFormData, TransactionState } from "@/types";
 import { useTerminal } from "@/components/terminal/TerminalContext";
 import { DEMO_MODE } from "@/config/wagmi";
+
+/**
+ * Verification result type
+ */
+export interface VerificationResult {
+  status: "pending" | "submitted" | "verified" | "not_merged" | "error";
+  txHash?: string;
+  gigId?: number;
+  amount?: string;
+  freelancer?: string;
+  error?: string;
+}
+
+/**
+ * Type for contract gig response (struct returned by getGig)
+ */
+interface ContractGig {
+  client: `0x${string}`;
+  freelancer: `0x${string}`;
+  amount: bigint;
+  repoOwner: string;
+  repoName: string;
+  prId: string;
+  isOpen: boolean;
+  createdAt: bigint;
+}
 
 /**
  * Demo gigs for UI development without wallet connection
@@ -62,6 +91,7 @@ const DEMO_GIGS: Gig[] = [
 export function useGigEscrow() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const config = useConfig();
   const { addLog } = useTerminal();
 
   // Get contract addresses for current chain
@@ -73,8 +103,16 @@ export function useGigEscrow() {
   // Demo mode state
   const [demoGigs, setDemoGigs] = useState<Gig[]>(DEMO_GIGS);
 
+  // Production mode state - store fetched gigs
+  const [productionGigs, setProductionGigs] = useState<Gig[]>([]);
+  const [isLoadingGigs, setIsLoadingGigs] = useState(false);
+
+  // Verification state - tracks pending verifications and their results
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const pendingVerificationGigId = useRef<number | null>(null);
+
   // Contract write hooks
-  const { writeContract, data: txHash, isPending: isWritePending, error: writeError } = useWriteContract();
+  const { writeContractAsync, data: txHash, isPending: isWritePending, error: writeError } = useWriteContract();
 
   // Wait for transaction receipt
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -89,6 +127,96 @@ export function useGigEscrow() {
     query: {
       enabled: isConnected && !DEMO_MODE,
     },
+  });
+
+  // Watch for WorkVerified events
+  useWatchContractEvent({
+    address: escrowAddress,
+    abi: GIG_ESCROW_ABI,
+    eventName: "WorkVerified",
+    onLogs(logs) {
+      logs.forEach((log) => {
+        try {
+          const decoded = decodeEventLog({
+            abi: GIG_ESCROW_ABI,
+            data: log.data,
+            topics: log.topics,
+          });
+          
+          if (decoded.eventName === "WorkVerified") {
+            const { gigId, isMerged } = decoded.args as { gigId: bigint; requestId: `0x${string}`; isMerged: boolean };
+            const gigIdNum = Number(gigId);
+            
+            addLog("info", `WorkVerified event: Gig #${gigIdNum}, merged: ${isMerged}`, "chainlink");
+            
+            // If this is for our pending verification and PR is NOT merged
+            if (pendingVerificationGigId.current === gigIdNum && !isMerged) {
+              setVerificationResult({
+                status: "not_merged",
+                gigId: gigIdNum,
+                error: "PR is not merged yet. Please merge the PR first and try again.",
+              });
+              pendingVerificationGigId.current = null;
+              addLog("warning", `Gig #${gigIdNum}: PR is not merged yet`, "chainlink");
+            }
+            // If merged, we wait for PaymentReleased event
+          }
+        } catch (err) {
+          console.error("Failed to decode WorkVerified event:", err);
+        }
+      });
+    },
+    enabled: !DEMO_MODE && isConnected,
+  });
+
+  // Watch for PaymentReleased events
+  useWatchContractEvent({
+    address: escrowAddress,
+    abi: GIG_ESCROW_ABI,
+    eventName: "PaymentReleased",
+    onLogs(logs) {
+      logs.forEach((log) => {
+        try {
+          const decoded = decodeEventLog({
+            abi: GIG_ESCROW_ABI,
+            data: log.data,
+            topics: log.topics,
+          });
+          
+          if (decoded.eventName === "PaymentReleased") {
+            const { gigId, freelancer, amount } = decoded.args as { gigId: bigint; freelancer: `0x${string}`; amount: bigint };
+            const gigIdNum = Number(gigId);
+            const amountFormatted = formatUnits(amount, 18);
+            
+            addLog("success", `PaymentReleased: Gig #${gigIdNum}, ${amountFormatted} MNEE to ${freelancer.slice(0, 10)}...`, "escrow");
+            
+            // If this is for our pending verification, mark as verified/success
+            if (pendingVerificationGigId.current === gigIdNum) {
+              setVerificationResult({
+                status: "verified",
+                gigId: gigIdNum,
+                amount: amountFormatted,
+                freelancer: freelancer,
+                txHash: log.transactionHash,
+              });
+              pendingVerificationGigId.current = null;
+              
+              // Update local gig state
+              setProductionGigs((prev) =>
+                prev.map((gig) =>
+                  gig.id === gigIdNum
+                    ? { ...gig, status: GigStatus.MERGED, isOpen: false }
+                    : gig
+                )
+              );
+            }
+          }
+        } catch (err) {
+          console.error("Failed to decode PaymentReleased event:", err);
+        }
+      });
+    },
+    enabled: !DEMO_MODE && isConnected,
   });
 
   // Update transaction state based on write status
@@ -107,7 +235,68 @@ export function useGigEscrow() {
   }, [isWritePending, isConfirming, isConfirmed, txHash, writeError, addLog]);
 
   /**
+   * Fetch all gigs from the contract
+   */
+  const fetchAllGigs = useCallback(async () => {
+    if (DEMO_MODE || !isConnected || !gigCount) return;
+
+    setIsLoadingGigs(true);
+    try {
+      const count = Number(gigCount);
+      const gigs: Gig[] = [];
+
+      for (let i = 1; i <= count; i++) {
+        try {
+          const gigData = await readContract(config, {
+            address: escrowAddress,
+            abi: GIG_ESCROW_ABI,
+            functionName: "getGig",
+            args: [BigInt(i)],
+          }) as ContractGig;
+
+          if (gigData) {
+            // Determine status based on isOpen
+            let status = GigStatus.LOCKED;
+            if (!gigData.isOpen) {
+              status = GigStatus.MERGED; // Assuming closed means merged/paid
+            }
+
+            gigs.push({
+              id: i,
+              client: gigData.client,
+              freelancer: gigData.freelancer,
+              amount: gigData.amount,
+              repoOwner: gigData.repoOwner,
+              repoName: gigData.repoName,
+              prId: gigData.prId,
+              isOpen: gigData.isOpen,
+              createdAt: Number(gigData.createdAt),
+              status,
+            });
+          }
+        } catch (err) {
+          console.error(`Failed to fetch gig ${i}:`, err);
+        }
+      }
+
+      setProductionGigs(gigs);
+    } catch (error) {
+      console.error("Failed to fetch gigs:", error);
+    } finally {
+      setIsLoadingGigs(false);
+    }
+  }, [config, escrowAddress, gigCount, isConnected]);
+
+  // Fetch gigs when gigCount changes
+  useEffect(() => {
+    if (!DEMO_MODE && isConnected && gigCount) {
+      fetchAllGigs();
+    }
+  }, [gigCount, isConnected, fetchAllGigs]);
+
+  /**
    * Approve MNEE tokens for the escrow contract
+   * Waits for transaction confirmation before returning
    */
   const approveTokens = useCallback(
     async (amount: string) => {
@@ -118,22 +307,34 @@ export function useGigEscrow() {
         return;
       }
 
-      addLog("info", `Approving ${amount} MNEE tokens...`, "token");
+      addLog("info", `Approving ${amount} MNEE tokens for escrow contract...`, "token");
 
       try {
         const amountWei = parseUnits(amount, 18);
-        writeContract({
+        const hash = await writeContractAsync({
           address: tokenAddress,
           abi: ERC20_ABI,
           functionName: "approve",
           args: [escrowAddress, amountWei],
+          gas: BigInt(100000), // Explicit gas limit for approval
         });
-      } catch (error) {
-        addLog("error", `Approval failed: ${error}`, "token");
+        addLog("info", `Approval tx submitted: ${hash.slice(0, 10)}... Waiting for confirmation...`, "token");
+        
+        // Wait for the approval transaction to be confirmed
+        const receipt = await waitForTransactionReceipt(config, { hash });
+        
+        if (receipt.status === "success") {
+          addLog("success", `Token approval confirmed! Block: ${receipt.blockNumber}`, "token");
+        } else {
+          throw new Error("Approval transaction failed");
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addLog("error", `Approval failed: ${errorMessage}`, "token");
         throw error;
       }
     },
-    [writeContract, tokenAddress, escrowAddress, addLog]
+    [writeContractAsync, tokenAddress, escrowAddress, addLog, config]
   );
 
   /**
@@ -170,7 +371,8 @@ export function useGigEscrow() {
 
       try {
         const amountWei = parseUnits(formData.amount, 18);
-        writeContract({
+        addLog("info", `Sending transaction with gas limit: 300000`, "tx");
+        const hash = await writeContractAsync({
           address: escrowAddress,
           abi: GIG_ESCROW_ABI,
           functionName: "createGig",
@@ -181,20 +383,36 @@ export function useGigEscrow() {
             formData.repoName,
             formData.prId,
           ],
+          gas: BigInt(300000),
         });
-      } catch (error) {
-        addLog("error", `Failed to create gig: ${error}`, "escrow");
+        addLog("info", `Transaction submitted: ${hash.slice(0, 10)}... Waiting for confirmation...`, "tx");
+        
+        // Wait for the transaction to be confirmed
+        const receipt = await waitForTransactionReceipt(config, { hash });
+        
+        if (receipt.status === "success") {
+          addLog("success", `Gig created successfully! Block: ${receipt.blockNumber}`, "escrow");
+          // Refetch gig count and gigs to update the UI
+          await refetchGigCount();
+        } else {
+          throw new Error("Transaction failed on-chain");
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        addLog("error", `Failed to create gig: ${errorMessage}`, "escrow");
         throw error;
       }
     },
-    [writeContract, escrowAddress, addLog, address, demoGigs.length]
+    [writeContractAsync, escrowAddress, addLog, address, demoGigs.length, config, refetchGigCount]
   );
 
   /**
    * Verify work and trigger Chainlink Functions
+   * Returns a promise that resolves when the verification request is submitted
+   * The actual verification result comes via events (WorkVerified, PaymentReleased)
    */
   const verifyWork = useCallback(
-    async (gigId: number) => {
+    async (gigId: number): Promise<{ txHash: string; status: "submitted" | "error" }> => {
       if (DEMO_MODE) {
         addLog("command", `verifyWork(${gigId})`, "contract");
         addLog("info", "[DEMO] Initiating work verification...", "chainlink");
@@ -218,27 +436,85 @@ export function useGigEscrow() {
           )
         );
 
+        // Set demo verification result
+        setVerificationResult({
+          status: "verified",
+          gigId,
+          amount: "1000",
+          txHash: "0xdemo123456789",
+        });
+
         addLog("success", `[DEMO] Gig #${gigId} verified! PR is merged. Funds released.`, "escrow");
-        return;
+        return { txHash: "0xdemo123456789", status: "submitted" };
       }
 
       addLog("command", `verifyWork(${gigId})`, "contract");
       addLog("info", "Initiating work verification...", "chainlink");
 
+      // Reset verification result and set pending gig ID
+      setVerificationResult({ status: "pending", gigId });
+      pendingVerificationGigId.current = gigId;
+
       try {
-        writeContract({
+        const hash = await writeContractAsync({
           address: escrowAddress,
           abi: GIG_ESCROW_ABI,
           functionName: "verifyWork",
           args: [BigInt(gigId)],
+          gas: BigInt(5000000), // Increased gas limit for Chainlink Functions call
         });
-      } catch (error) {
-        addLog("error", `Verification failed: ${error}`, "chainlink");
+        
+        addLog("info", `Verification tx submitted: ${hash.slice(0, 10)}... Waiting for confirmation...`, "chainlink");
+        
+        // Wait for the transaction to be confirmed
+        const receipt = await waitForTransactionReceipt(config, { hash });
+        
+        if (receipt.status === "success") {
+          addLog("success", `Verification request confirmed! Block: ${receipt.blockNumber}`, "chainlink");
+          addLog("info", "Waiting for Chainlink oracle response... This may take 1-2 minutes.", "chainlink");
+          
+          // Update verification result to submitted (waiting for oracle)
+          setVerificationResult({
+            status: "submitted",
+            txHash: hash,
+            gigId,
+          });
+          
+          return { txHash: hash, status: "submitted" };
+        } else {
+          // Transaction failed on-chain
+          const errorMsg = "Verification transaction failed on-chain";
+          setVerificationResult({
+            status: "error",
+            gigId,
+            error: errorMsg,
+          });
+          pendingVerificationGigId.current = null;
+          addLog("error", errorMsg, "chainlink");
+          throw new Error(errorMsg);
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        setVerificationResult({
+          status: "error",
+          gigId,
+          error: errorMessage,
+        });
+        pendingVerificationGigId.current = null;
+        addLog("error", `Verification failed: ${errorMessage}`, "chainlink");
         throw error;
       }
     },
-    [writeContract, escrowAddress, addLog]
+    [writeContractAsync, escrowAddress, addLog, config]
   );
+
+  /**
+   * Clear verification result (call after handling the result in UI)
+   */
+  const clearVerificationResult = useCallback(() => {
+    setVerificationResult(null);
+    pendingVerificationGigId.current = null;
+  }, []);
 
   /**
    * Get a specific gig by ID
@@ -249,22 +525,56 @@ export function useGigEscrow() {
         return demoGigs.find((g) => g.id === gigId) || null;
       }
 
-      // This would use readContract in production
+      // Check local cache first
+      const cachedGig = productionGigs.find((g) => g.id === gigId);
+      if (cachedGig) return cachedGig;
+
+      // Fetch from contract
+      try {
+        const gigData = await readContract(config, {
+          address: escrowAddress,
+          abi: GIG_ESCROW_ABI,
+          functionName: "getGig",
+          args: [BigInt(gigId)],
+        }) as ContractGig;
+
+        if (gigData) {
+          let status = GigStatus.LOCKED;
+          if (!gigData.isOpen) {
+            status = GigStatus.MERGED;
+          }
+
+          return {
+            id: gigId,
+            client: gigData.client,
+            freelancer: gigData.freelancer,
+            amount: gigData.amount,
+            repoOwner: gigData.repoOwner,
+            repoName: gigData.repoName,
+            prId: gigData.prId,
+            isOpen: gigData.isOpen,
+            createdAt: Number(gigData.createdAt),
+            status,
+          };
+        }
+      } catch (err) {
+        console.error(`Failed to fetch gig ${gigId}:`, err);
+      }
+
       return null;
     },
-    [demoGigs]
+    [demoGigs, productionGigs, config, escrowAddress]
   );
 
   /**
-   * Get all gigs (demo mode returns mock data)
+   * Get all gigs (demo mode returns mock data, production returns fetched gigs)
    */
   const getAllGigs = useCallback((): Gig[] => {
     if (DEMO_MODE) {
       return demoGigs;
     }
-    // In production, this would fetch from contract events or indexer
-    return [];
-  }, [demoGigs]);
+    return productionGigs;
+  }, [demoGigs, productionGigs]);
 
   /**
    * Reset transaction state
@@ -281,6 +591,8 @@ export function useGigEscrow() {
     txState,
     gigCount: gigCount ? Number(gigCount) : demoGigs.length,
     isDemoMode: DEMO_MODE,
+    isLoadingGigs,
+    verificationResult,
 
     // Actions
     approveTokens,
@@ -290,6 +602,8 @@ export function useGigEscrow() {
     getAllGigs,
     resetTxState,
     refetchGigCount,
+    fetchAllGigs,
+    clearVerificationResult,
   };
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAccount } from "wagmi";
 import { formatUnits } from "viem";
@@ -10,10 +10,9 @@ import { RepoCard } from "@/components/cards/RepoCard";
 import { TerminalLogger } from "@/components/terminal/TerminalLogger";
 import { CreateGigForm } from "@/components/forms/CreateGigForm";
 import { SuccessOverlay } from "@/components/overlays/SuccessOverlay";
-import { useGigEscrow, useMNEEBalance } from "@/hooks/useGigEscrow";
-import { Gig, GigStatus, CreateGigFormData } from "@/types";
-import { DEMO_MODE } from "@/config/wagmi";
-import { VscIssues, VscAdd, VscRefresh, VscFilter } from "react-icons/vsc";
+import { useGigEscrow, useMNEEBalance, useMNEEAllowance } from "@/hooks/useGigEscrow";
+import { Gig, CreateGigFormData } from "@/types";
+import { VscIssues, VscAdd, VscRefresh } from "react-icons/vsc";
 
 /**
  * Filter tabs for gig status
@@ -116,10 +115,12 @@ function GigList({
   gigs,
   onVerify,
   isVerifying,
+  userAddress,
 }: {
   gigs: Gig[];
   onVerify: (gigId: number) => void;
   isVerifying: boolean;
+  userAddress?: `0x${string}`;
 }) {
   if (gigs.length === 0) {
     return <EmptyState filter="all" />;
@@ -128,24 +129,154 @@ function GigList({
   return (
     <div className="space-y-4">
       <AnimatePresence mode="popLayout">
-        {gigs.map((gig, index) => (
-          <motion.div
-            key={gig.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ delay: index * 0.05 }}
-            layout
-          >
-            <RepoCard
-              gig={gig}
-              onVerify={() => onVerify(gig.id)}
-              isVerifying={isVerifying}
-            />
-          </motion.div>
-        ))}
+        {gigs.map((gig, index) => {
+          const isUserClient = userAddress?.toLowerCase() === gig.client.toLowerCase();
+          const isUserFreelancer = userAddress?.toLowerCase() === gig.freelancer.toLowerCase();
+          
+          return (
+            <motion.div
+              key={gig.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ delay: index * 0.05 }}
+              layout
+            >
+              <RepoCard
+                gig={gig}
+                onVerify={() => onVerify(gig.id)}
+                isVerifying={isVerifying}
+                isUserClient={isUserClient}
+                isUserFreelancer={isUserFreelancer}
+              />
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
     </div>
+  );
+}
+
+/**
+ * Verification waiting overlay component
+ */
+function VerificationWaitingOverlay({
+  isVisible,
+  onCancel,
+  status,
+}: {
+  isVisible: boolean;
+  onCancel: () => void;
+  status: "pending" | "submitted";
+}) {
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-void/80 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-void-50 border border-void-200 rounded-sm p-8 max-w-md w-full mx-4 text-center"
+          >
+            {/* Animated spinner */}
+            <div className="w-16 h-16 mx-auto mb-6 relative">
+              <div className="absolute inset-0 border-2 border-void-200 rounded-full" />
+              <div className="absolute inset-0 border-2 border-neon-green border-t-transparent rounded-full animate-spin" />
+              <div className="absolute inset-2 border-2 border-neon-purple border-b-transparent rounded-full animate-spin" style={{ animationDirection: "reverse", animationDuration: "1.5s" }} />
+            </div>
+
+            <h3 className="font-mono font-bold text-terminal-text text-lg mb-2">
+              {status === "pending" ? "Submitting Verification..." : "Waiting for Oracle Response"}
+            </h3>
+            
+            <p className="text-terminal-muted text-sm mb-4">
+              {status === "pending" 
+                ? "Please confirm the transaction in your wallet."
+                : "Chainlink Functions is verifying the PR merge status. This may take 1-2 minutes."}
+            </p>
+
+            {status === "submitted" && (
+              <div className="bg-void-100 border border-void-200 rounded-sm p-3 mb-4">
+                <div className="flex items-center gap-2 text-xs text-terminal-muted">
+                  <span className="w-2 h-2 rounded-full bg-neon-yellow animate-pulse" />
+                  <span>Chainlink DON is processing your request...</span>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 text-sm font-mono text-terminal-muted hover:text-terminal-text transition-colors"
+            >
+              Close (verification continues in background)
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/**
+ * Verification error overlay component
+ */
+function VerificationErrorOverlay({
+  isVisible,
+  onClose,
+  error,
+}: {
+  isVisible: boolean;
+  onClose: () => void;
+  error?: string;
+}) {
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-void/80 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-void-50 border border-neon-red/30 rounded-sm p-8 max-w-md w-full mx-4 text-center"
+          >
+            {/* Error icon */}
+            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-neon-red/10 border border-neon-red/30 flex items-center justify-center">
+              <svg className="w-8 h-8 text-neon-red" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+            </div>
+
+            <h3 className="font-mono font-bold text-neon-red text-lg mb-2">
+              Verification Failed
+            </h3>
+            
+            <p className="text-terminal-muted text-sm mb-6">
+              {error || "An error occurred during verification. Please try again."}
+            </p>
+
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-void-100 border border-void-200 rounded-sm font-mono text-sm text-terminal-text hover:bg-void-200 transition-colors"
+            >
+              Close
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -157,20 +288,75 @@ export default function DashboardPage() {
   const {
     getAllGigs,
     createGig,
+    approveTokens,
     verifyWork,
-    txState,
     isDemoMode,
+    verificationResult,
+    clearVerificationResult,
+    fetchAllGigs,
   } = useGigEscrow();
+  const { allowance, refetch: refetchAllowance } = useMNEEAllowance();
 
   // Local state
   const [activeFilter, setActiveFilter] = useState<"all" | "open" | "merged">("all");
   const [isCreating, setIsCreating] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showWaiting, setShowWaiting] = useState(false);
+  const [showError, setShowError] = useState(false);
   const [successData, setSuccessData] = useState<{
     amount?: string;
     txHash?: string;
   }>({});
+  const [errorMessage, setErrorMessage] = useState<string>("");
+
+  // Watch for verification result changes
+  useEffect(() => {
+    if (!verificationResult) return;
+
+    switch (verificationResult.status) {
+      case "pending":
+        setShowWaiting(true);
+        setShowError(false);
+        setShowSuccess(false);
+        break;
+      
+      case "submitted":
+        setShowWaiting(true);
+        setIsVerifying(false); // Transaction submitted, no longer "verifying" in the button sense
+        break;
+      
+      case "verified":
+        // Payment released! Show success
+        setShowWaiting(false);
+        setShowError(false);
+        setSuccessData({
+          amount: verificationResult.amount,
+          txHash: verificationResult.txHash,
+        });
+        setShowSuccess(true);
+        setIsVerifying(false);
+        // Refresh gigs to update the UI
+        fetchAllGigs();
+        break;
+      
+      case "not_merged":
+        // PR not merged yet
+        setShowWaiting(false);
+        setErrorMessage(verificationResult.error || "PR is not merged yet. Please merge the PR first and try again.");
+        setShowError(true);
+        setIsVerifying(false);
+        break;
+      
+      case "error":
+        // Transaction or verification error
+        setShowWaiting(false);
+        setErrorMessage(verificationResult.error || "Verification failed. Please try again.");
+        setShowError(true);
+        setIsVerifying(false);
+        break;
+    }
+  }, [verificationResult, fetchAllGigs]);
 
   // Get all gigs
   const allGigs = getAllGigs();
@@ -190,40 +376,75 @@ export default function DashboardPage() {
     merged: allGigs.filter((g) => !g.isOpen).length,
   };
 
-  // Handle create gig
+  // Handle create gig with token approval
   const handleCreateGig = useCallback(
     async (formData: CreateGigFormData) => {
       setIsCreating(true);
       try {
+        // Parse the amount to wei for comparison
+        const amountWei = BigInt(parseFloat(formData.amount) * 10 ** 18);
+        
+        // Check if we need to approve tokens first
+        const currentAllowance = allowance ?? BigInt(0);
+        
+        if (currentAllowance < amountWei) {
+          // Need to approve tokens first
+          await approveTokens(formData.amount);
+          
+          // Wait a bit for the approval to be indexed, then refetch
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          await refetchAllowance();
+        }
+        
+        // Now create the gig
         await createGig(formData);
       } finally {
         setIsCreating(false);
       }
     },
-    [createGig]
+    [createGig, approveTokens, allowance, refetchAllowance]
   );
 
   // Handle verify work
   const handleVerify = useCallback(
     async (gigId: number) => {
       setIsVerifying(true);
+      setShowError(false);
+      setShowSuccess(false);
+      
       try {
+        // This will submit the verification request
+        // The actual result comes via events (WorkVerified, PaymentReleased)
         await verifyWork(gigId);
-        // Show success overlay after verification
-        const gig = allGigs.find((g) => g.id === gigId);
-        if (gig) {
-          setSuccessData({
-            amount: formatUnits(gig.amount, 18),
-            txHash: txState.hash,
-          });
-          setShowSuccess(true);
-        }
-      } finally {
+        // Note: We don't show success here anymore!
+        // Success is shown when PaymentReleased event is received
+      } catch {
+        // Error is already handled in the hook and will update verificationResult
         setIsVerifying(false);
       }
     },
-    [verifyWork, allGigs, txState.hash]
+    [verifyWork]
   );
+
+  // Handle closing the waiting overlay
+  const handleCloseWaiting = useCallback(() => {
+    setShowWaiting(false);
+    // Don't clear verification result - we still want to listen for events
+  }, []);
+
+  // Handle closing the error overlay
+  const handleCloseError = useCallback(() => {
+    setShowError(false);
+    setErrorMessage("");
+    clearVerificationResult();
+  }, [clearVerificationResult]);
+
+  // Handle closing the success overlay
+  const handleCloseSuccess = useCallback(() => {
+    setShowSuccess(false);
+    setSuccessData({});
+    clearVerificationResult();
+  }, [clearVerificationResult]);
 
   return (
     <div className="min-h-screen bg-void">
@@ -298,6 +519,7 @@ export default function DashboardPage() {
                   gigs={filteredGigs}
                   onVerify={handleVerify}
                   isVerifying={isVerifying}
+                  userAddress={address}
                 />
               </div>
             </motion.div>
@@ -372,10 +594,24 @@ export default function DashboardPage() {
       {/* Terminal Logger */}
       <TerminalLogger />
 
+      {/* Verification Waiting Overlay */}
+      <VerificationWaitingOverlay
+        isVisible={showWaiting}
+        onCancel={handleCloseWaiting}
+        status={verificationResult?.status === "submitted" ? "submitted" : "pending"}
+      />
+
+      {/* Verification Error Overlay */}
+      <VerificationErrorOverlay
+        isVisible={showError}
+        onClose={handleCloseError}
+        error={errorMessage}
+      />
+
       {/* Success Overlay */}
       <SuccessOverlay
         isVisible={showSuccess}
-        onClose={() => setShowSuccess(false)}
+        onClose={handleCloseSuccess}
         title="PR Merged Successfully!"
         message="Funds have been released to the freelancer."
         amount={successData.amount}
