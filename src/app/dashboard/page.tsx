@@ -114,12 +114,16 @@ function EmptyState({ filter }: { filter: string }) {
 function GigList({
   gigs,
   onVerify,
+  onCancel,
   isVerifying,
+  isCancelling,
   userAddress,
 }: {
   gigs: Gig[];
   onVerify: (gigId: number) => void;
+  onCancel: (gigId: number) => void;
   isVerifying: boolean;
+  isCancelling: boolean;
   userAddress?: `0x${string}`;
 }) {
   if (gigs.length === 0) {
@@ -145,7 +149,9 @@ function GigList({
               <RepoCard
                 gig={gig}
                 onVerify={() => onVerify(gig.id)}
+                onCancel={() => onCancel(gig.id)}
                 isVerifying={isVerifying}
+                isCancelling={isCancelling}
                 isUserClient={isUserClient}
                 isUserFreelancer={isUserFreelancer}
               />
@@ -290,6 +296,7 @@ export default function DashboardPage() {
     createGig,
     approveTokens,
     verifyWork,
+    cancelGig,
     isDemoMode,
     verificationResult,
     clearVerificationResult,
@@ -301,6 +308,7 @@ export default function DashboardPage() {
   const [activeFilter, setActiveFilter] = useState<"all" | "open" | "merged">("all");
   const [isCreating, setIsCreating] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showWaiting, setShowWaiting] = useState(false);
   const [showError, setShowError] = useState(false);
@@ -426,6 +434,20 @@ export default function DashboardPage() {
     [verifyWork]
   );
 
+  const handleCancel = useCallback(async (gigId: number) => {
+  if (!confirm("Are you sure? This will refund the MNEE to your wallet.")) return;
+  
+  setIsCancelling(true);
+  try {
+    await cancelGig(gigId);
+    // Success notification is handled by the hook's logs or you can add one here
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setIsCancelling(false);
+  }
+}, [cancelGig]);
+
   // Handle closing the waiting overlay
   const handleCloseWaiting = useCallback(() => {
     setShowWaiting(false);
@@ -518,6 +540,8 @@ export default function DashboardPage() {
                 <GigList
                   gigs={filteredGigs}
                   onVerify={handleVerify}
+                  onCancel={handleCancel}
+                  isCancelling={isCancelling}
                   isVerifying={isVerifying}
                   userAddress={address}
                 />

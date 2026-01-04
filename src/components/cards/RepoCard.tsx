@@ -11,7 +11,9 @@ import { FaGithub } from "react-icons/fa";
 interface RepoCardProps {
   gig: Gig;
   onVerify?: (gigId: number) => void;
+  onCancel?: (gigId: number) => void;
   isVerifying?: boolean;
+  isCancelling?: boolean;
   isUserClient?: boolean;
   isUserFreelancer?: boolean;
 }
@@ -131,7 +133,9 @@ function ConfettiPop() {
 export function RepoCard({
   gig,
   onVerify,
+  onCancel,
   isVerifying = false,
+  isCancelling = false,
   isUserClient = false,
   isUserFreelancer = false,
 }: RepoCardProps) {
@@ -292,6 +296,35 @@ export function RepoCard({
                   </svg>
                   <span>Gasless Claim</span>
                 </div>
+              )}
+
+              {/* Cancel button - only for client */}
+              {isUserClient && (
+                <button
+                  onClick={() => onCancel?.(gig.id)}
+                  disabled={isCancelling}
+                  className={cn(
+                    "px-3 py-1.5 rounded-sm font-mono text-xs transition-all",
+                    "border border-neon-red/50 text-neon-red hover:bg-neon-red/10",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  {isCancelling ? (
+                    <span className="flex items-center gap-1.5">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+                        </svg>
+                      </motion.div>
+                      Cancelling...
+                    </span>
+                  ) : (
+                    "Cancel Gig"
+                  )}
+                </button>
               )}
 
               {/* Verify button */}

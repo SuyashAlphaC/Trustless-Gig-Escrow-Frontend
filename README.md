@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 💻 Trustless Gig Escrow (Frontend)
 
-## Getting Started
+The interactive dashboard for the Trustless Gig Escrow platform. Built with a "Cyberpunk / GitHub Dark" aesthetic, it provides a seamless interface for clients to fund gigs and freelancers to claim payments.
 
-First, run the development server:
+![Landing Page Preview](./public/homeview.png)
+![Dashboard Preview](./public/dashboardPage.png)
+
+## ✨ Features
+
+* **Interactive Terminal:** A real-time logger at the bottom of the screen that visualizes blockchain transactions as they happen.
+* **GitHub Integration:** "Repo Cards" that mimic GitHub's UI, complete with neon status indicators (Locked, Merged, Paid).
+* **Gasless UX:** Visual cues indicating MNEE's gas-efficient transfer capabilities.
+* **Demo Mode:** A built-in simulation mode to demonstrate the full flow without needing a wallet connection (perfect for judges).
+* **Real-Time Animations:** Framer Motion animations for "CI/CD Pipeline" verification steps.
+
+---
+
+## 🛠️ Tech Stack
+* **Framework:** Next.js 14 (App Router)
+* **Styling:** Tailwind CSS + Shadcn/UI
+* **Web3:** Wagmi v2 + Viem + RainbowKit
+* **Animations:** Framer Motion
+
+---
+
+## 🚀 Getting Started
+
+### 1. Installation
+
+```bash
+# Clone the repository
+cd trustless-gig-escrow-frontend
+```
+
+### 2. Configuration
+
+Create a `.env.local` file:
+
+```bash
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
+NEXT_PUBLIC_SEPOLIA_RPC_URL=[https://ethereum-sepolia.publicnode.com](https://ethereum-sepolia.publicnode.com)
+
+# Set to 'true' to run without blockchain connection
+NEXT_PUBLIC_DEMO_MODE=false 
+
+```
+
+### 3. Update Contract Addresses
+
+Open `src/config/contracts.ts` and paste your deployed contract addresses:
+
+```typescript
+[sepolia.id]: {
+  escrow: "0xYourEscrowContract",
+  mneeToken: "0xYourMockToken",
+}
+
+```
+
+### 4. Run Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](https://www.google.com/search?q=http://localhost:3000) to see the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🎮 How to Demo
 
-## Learn More
+### Option A: Simulation Mode
 
-To learn more about Next.js, take a look at the following resources:
+Set `NEXT_PUBLIC_DEMO_MODE=true` in your `.env.local`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+* This populates the dashboard with fake data.
+* Transactions (Create, Verify) are simulated with delays to show animations.
+* **Best for:** Quick video walkthroughs where speed is key.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Option B: Live Testnet Mode
 
-## Deploy on Vercel
+Set `NEXT_PUBLIC_DEMO_MODE=false`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Connect your MetaMask wallet (Sepolia).
+2. **Approve MNEE:** Use the yellow "Approve" button on the Create Gig form.
+3. **Create Gig:** Deposit Mock MNEE.
+4. **Verify:** Click "Verify & Merge" (requires LINK in the contract).
+5. **Cancel:** Use the "Cancel Gig" button.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 📂 Project Structure
+
+```bash
+src/
+├── app/              # Next.js Pages (Dashboard, Landing)
+├── components/       # React Components
+|   ├── buttons/      # Buttons
+|   ├── layout/       # UI Layout
+|   ├── overlays/     # Popups
+│   ├── cards/        # RepoCard, GigStatus
+│   ├── forms/        # CreateGigForm (Code-editor style)
+│   └── terminal/     # The "Matrix" style logger
+|   ├── providers/
+├── hooks/            # Custom Wagmi Hooks (useGigEscrow.ts)
+└── config/           # Contract ABIs and Addresses
+
+```
+
+```
+
+```

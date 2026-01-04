@@ -508,6 +508,79 @@ export function useGigEscrow() {
     [writeContractAsync, escrowAddress, addLog, config]
   );
 
+   /**
+   * Cancel a gig and reclaim funds (client only)
+   * @param gigId The ID of the gig to cancel
+   * @returns Transaction hash and status
+   */
+  const cancelGig = useCallback(
+    async (gigId: number): Promise<{ txHash: string; status: string }> => {
+      if (DEMO_MODE) {
+        // Demo mode - simulate cancellation
+        setDemoGigs((prev) =>
+          prev.map((g) =>
+            g.id === gigId
+              ? { ...g, isOpen: false, status: GigStatus.CANCELLED }
+              : g
+          )
+        );
+
+        addLog("success", `[DEMO] Gig #${gigId} cancelled! Funds returned to client.`, "escrow");
+        return { txHash: "0xdemo_cancel_123456789", status: "success" };
+      }
+
+      addLog("command", `cancelGig(${gigId})`, "contract");
+      addLog("info", "Initiating gig cancellation...", "escrow");
+
+      try {
+        const hash = await writeContractAsync({
+          address: escrowAddress,
+          abi: GIG_ESCROW_ABI,
+          functionName: "cancelGig",
+          args: [BigInt(gigId)],
+          gas: BigInt(200000),
+        });
+
+        addLog("info", `Cancellation tx submitted: ${hash.slice(0, 10)}... Waiting for confirmation...`, "escrow");
+
+        // Wait for the transaction to be confirmed
+        const receipt = await waitForTransactionReceipt(config, { hash });
+
+        if (receipt.status === "success") {
+          addLog("success", `Gig #${gigId} cancelled successfully! Funds returned to client.`, "escrow");
+          
+          // Refresh gigs to update the UI
+          await fetchAllGigs();
+          
+          return { txHash: hash, status: "success" };
+        } else {
+          const errorMsg = "Cancellation transaction failed on-chain";
+          addLog("error", errorMsg, "escrow");
+          throw new Error(errorMsg);
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Parse common contract errors
+        let userFriendlyError = errorMessage;
+        if (errorMessage.includes("GigEscrow__UnauthorizedCaller")) {
+          userFriendlyError = "Only the client can cancel this gig";
+        } else if (errorMessage.includes("GigEscrow__GigTooRecent")) {
+          userFriendlyError = "Cannot cancel yet - 24 hours must pass since gig creation";
+        } else if (errorMessage.includes("GigEscrow__RequestAlreadyPending")) {
+          userFriendlyError = "Cannot cancel - verification is in progress";
+        } else if (errorMessage.includes("GigEscrow__GigNotOpen")) {
+          userFriendlyError = "This gig is already closed";
+        }
+        
+        addLog("error", `Cancellation failed: ${userFriendlyError}`, "escrow");
+        throw new Error(userFriendlyError);
+      }
+    },
+    [writeContractAsync, escrowAddress, addLog, config, fetchAllGigs]
+  );
+
+
   /**
    * Clear verification result (call after handling the result in UI)
    */
@@ -598,6 +671,7 @@ export function useGigEscrow() {
     approveTokens,
     createGig,
     verifyWork,
+    cancelGig,
     getGig,
     getAllGigs,
     resetTxState,
