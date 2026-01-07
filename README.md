@@ -100,7 +100,12 @@ The official MNEE token address on Ethereum Mainnet is:
 2. **Update Configuration:**
 Open `src/config/contracts.ts` and paste the MNEE token address:
 ```typescript
-mneeToken: "0x8ccedbae4916b79da7f3f612efb2eb93a2bfd6cf",
+ // Ethereum Mainnet
+  [mainnet.id]: {
+    escrow: "Mainnet deployed Escrow contract",
+    mneeToken: "`0x8ccedbae4916b79da7f3f612efb2eb93a2bfd6cf`
+",
+  },
 ```
 ---
 
