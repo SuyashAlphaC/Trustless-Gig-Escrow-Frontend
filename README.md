@@ -88,6 +88,20 @@ Set `NEXT_PUBLIC_DEMO_MODE=false`.
 4. **Verify:** Click "Verify & Merge" (requires LINK in the contract).
 5. **Cancel:** Use the "Cancel Gig" button.
 
+## 🚀 Mainnet Deployment Guide
+
+For this hackathon submission, we used a **Mock MNEE Token** on Sepolia Testnet to simulate the payment flow.
+
+To deploy this project on **Ethereum Mainnet** using the official MNEE Stablecoin, follow these simple steps:
+
+1. **Locate the Official MNEE Contract:**
+The official MNEE token address on Ethereum Mainnet is:
+`0x8ccedbae4916b79da7f3f612efb2eb93a2bfd6cf`
+2. **Update Configuration:**
+Open `src/config/contracts.ts` and paste the MNEE token address:
+```typescript
+mneeToken: "0x8ccedbae4916b79da7f3f612efb2eb93a2bfd6cf",
+```
 ---
 
 ## 📂 Project Structure
